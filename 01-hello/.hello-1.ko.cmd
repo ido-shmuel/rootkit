@@ -1,0 +1,1 @@
+cmd_/home/johnny/rootkit/hello/hello-1.ko := ld -r -m elf_x86_64 -z noexecstack --build-id=sha1  -T scripts/module.lds -o /home/johnny/rootkit/hello/hello-1.ko /home/johnny/rootkit/hello/hello-1.o /home/johnny/rootkit/hello/hello-1.mod.o;  true

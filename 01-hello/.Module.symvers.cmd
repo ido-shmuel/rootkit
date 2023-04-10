@@ -1,0 +1,1 @@
+cmd_/home/johnny/rootkit/hello/Module.symvers := sed 's/ko$$/o/' /home/johnny/rootkit/hello/modules.order | scripts/mod/modpost -m -a  -o /home/johnny/rootkit/hello/Module.symvers -e -i Module.symvers   -T -
