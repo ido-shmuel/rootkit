@@ -1,4 +1,4 @@
-obj-m += rootkit_not_working.o
+obj-m += rootkit.o
 
 all:
 	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) modules
